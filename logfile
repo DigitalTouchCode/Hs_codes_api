@@ -13,3 +13,17 @@
 2026-06-01 15:33:46.511 CAT [15147] LOG:  checkpoint complete: wrote 991 buffers (6.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=100.306 s, sync=0.084 s, total=100.433 s; sync files=310, longest=0.004 s, average=0.001 s; distance=4696 kB, estimate=4740 kB; lsn=0/209C228, redo lsn=0/209C198
 2026-06-01 15:42:06.686 CAT [15147] LOG:  checkpoint starting: time
 2026-06-01 15:42:22.571 CAT [15147] LOG:  checkpoint complete: wrote 157 buffers (1.0%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=15.837 s, sync=0.015 s, total=15.886 s; sync files=122, longest=0.005 s, average=0.001 s; distance=941 kB, estimate=4360 kB; lsn=0/2193BC8, redo lsn=0/2187958
+2026-06-01 16:23:22.202 CAT [15147] LOG:  checkpoint starting: immediate force wait
+2026-06-01 16:23:22.240 CAT [15147] LOG:  checkpoint complete: wrote 2 buffers (0.0%), wrote 0 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.011 s, sync=0.001 s, total=0.040 s; sync files=2, longest=0.001 s, average=0.001 s; distance=50 kB, estimate=3929 kB; lsn=0/2194408, redo lsn=0/21943B0
+2026-06-01 16:28:22.341 CAT [15147] LOG:  checkpoint starting: time
+2026-06-01 16:29:46.372 CAT [15147] LOG:  checkpoint complete: wrote 836 buffers (5.1%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=83.995 s, sync=0.001 s, total=84.032 s; sync files=4, longest=0.001 s, average=0.001 s; distance=4505 kB, estimate=4505 kB; lsn=0/25FB0E0, redo lsn=0/25FAA10
+2026-06-01 16:29:46.373 CAT [15147] LOG:  checkpoint starting: immediate force wait
+2026-06-01 16:29:46.388 CAT [15147] LOG:  checkpoint complete: wrote 1 buffers (0.0%), wrote 0 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.002 s, sync=0.001 s, total=0.016 s; sync files=1, longest=0.001 s, average=0.001 s; distance=1 kB, estimate=4055 kB; lsn=0/25FB1B0, redo lsn=0/25FB158
+2026-06-01 16:34:46.489 CAT [15147] LOG:  checkpoint starting: time
+2026-06-01 16:36:24.372 CAT [15147] LOG:  checkpoint complete: wrote 967 buffers (5.9%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=97.789 s, sync=0.078 s, total=97.883 s; sync files=311, longest=0.005 s, average=0.001 s; distance=4505 kB, estimate=4505 kB; lsn=0/2A637E8, redo lsn=0/2A61798
+2026-06-01 16:36:32.212 CAT [15147] LOG:  checkpoint starting: immediate force wait
+2026-06-01 16:36:32.229 CAT [15147] LOG:  checkpoint complete: wrote 1 buffers (0.0%), wrote 0 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.002 s, sync=0.001 s, total=0.018 s; sync files=1, longest=0.001 s, average=0.001 s; distance=9 kB, estimate=4056 kB; lsn=0/2A63FC8, redo lsn=0/2A63F70
+2026-06-01 16:41:32.331 CAT [15147] LOG:  checkpoint starting: time
+2026-06-01 16:42:27.984 CAT [15147] LOG:  checkpoint complete: wrote 555 buffers (3.4%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=55.626 s, sync=0.001 s, total=55.654 s; sync files=4, longest=0.001 s, average=0.001 s; distance=4505 kB, estimate=4505 kB; lsn=0/2ECAF18, redo lsn=0/2ECA720
+2026-06-01 16:42:27.984 CAT [15147] LOG:  checkpoint starting: immediate force wait
+2026-06-01 16:42:27.993 CAT [15147] LOG:  checkpoint complete: wrote 1 buffers (0.0%), wrote 0 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.001 s, sync=0.001 s, total=0.009 s; sync files=1, longest=0.001 s, average=0.001 s; distance=2 kB, estimate=4055 kB; lsn=0/2ECAFE8, redo lsn=0/2ECAF90
