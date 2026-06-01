@@ -26,6 +26,11 @@ class HsCode(models.Model):
     description = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["hs_code"], name="unique_hs_code")
+        ]
+
 
 # class Meta:
 #     indexes = [
