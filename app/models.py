@@ -30,11 +30,6 @@ class HsCode(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["hs_code"], name="unique_hs_code")
         ]
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=["hs_code"], name="unique_hs_code")
-        ]
         indexes = [
             GinIndex(
                 fields=["hs_code"],
