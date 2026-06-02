@@ -1,55 +1,44 @@
 name: Deploy Production
 
 on:
-workflow_run:
-workflows: ["CI"]
-branches: [main]
-types:
-- completed
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types:
+      - completed
 
 jobs:
-deploy:
-if: ${{ github.event.workflow_run.conclusion == 'success' }}
-
-runs-on: ubuntu-latest
-
-steps:
-  - name: Deploy to VPS
-    uses: appleboy/ssh-action@v1.0.3
-    with:
-      host: ${{ secrets.VPS_HOST }}
-      username: ${{ secrets.VPS_USER }}
-      key: ${{ secrets.VPS_SSH_KEY }}
-      port: ${{ secrets.VPS_PORT }}
-
-      script: |
-        set -e
-
-        cd /Hs_codes_api
-
-        echo "Pulling latest images..."
-        docker compose pull
-
-        echo "Starting updated containers..."
-        docker compose up -d
-
-        echo "Waiting for application..."
-        sleep 15
-
-        echo "Running migrations..."
-        docker compose exec -T web python manage.py migrate --noinput
-
-        echo "Checking health endpoint..."
-
-        for i in $(seq 1 20); do
-          if curl -fsS http://localhost:8001/api/v1/health/ > /dev/null; then
-            echo "Health check passed"
-            exit 0
-          fi
-
-          echo "Waiting for healthy container..."
-          sleep 5
-        done
-
-        echo "Health check failed"
-        exit 1
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -e
+            cd /Hs_codes_api
+            echo "Pulling latest images..."
+            docker compose pull
+            echo "Starting updated containers..."
+            docker compose up -d
+            echo "Waiting for application..."
+            sleep 15
+            echo "Running migrations..."
+            docker compose exec -T web python manage.py migrate --noinput
+            echo "Checking health endpoint..."
+            for i in $(seq 1 20); do
+              if curl -fsS http://localhost:8001/api/v1/health/ > /dev/null; then
+                echo "Health check passed"
+                exit 0
+              fi
+              echo "Waiting for healthy container..."
+              sleep 5
+            done
+            echo "Health check failed"
+            exit 1
