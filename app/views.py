@@ -81,6 +81,8 @@ class HsCodeSearchView(generics.ListAPIView):
                 q=q,
                 count=queryset.count(),
             )
+            
+            logger.info(queryset)
 
             return queryset
 
@@ -91,3 +93,11 @@ class HsCodeSearchView(generics.ListAPIView):
                 error=str(e),
             )
             raise
+
+
+class HealthCheckView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request):
+        return Response({"status": "healthy"})

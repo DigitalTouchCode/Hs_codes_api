@@ -64,15 +64,12 @@ def _parse_csv(text: str) -> list[dict]:
 
 
 def _build_objects(rows, hs_code_file):
-    from app.models import Category
-
     objects = []
     skipped_blank = 0
-    category_cache: dict[str, Category] = {}
 
     for row in rows:
-        hs_code = row.get("hs_code", "").strip()
-        description = row.get("description", "").strip()
+        hs_code = row.get("HS CODE", "").strip()
+        description = row.get("GOODS DESCRIPTION", "").strip()
 
         if not hs_code or not description:
             skipped_blank += 1
