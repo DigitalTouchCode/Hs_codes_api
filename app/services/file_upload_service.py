@@ -18,6 +18,8 @@ class UploadResult:
 def process_hs_code_csv(uploaded_file) -> UploadResult:
     text = _decode_file(uploaded_file)
     rows = _parse_csv(text)
+    
+    print(text)
 
     hs_code_file = HsCodeFile.objects.create(hs_code_file=uploaded_file)
     objects, skipped_blank = _build_objects(rows, hs_code_file)
@@ -45,9 +47,9 @@ def _parse_csv(text: str) -> list[dict]:
     try:
         reader = csv.DictReader(io.StringIO(text))
 
-        if not {"hs_code", "description"}.issubset(reader.fieldnames or []):
+        if not {"HS CODE", "GOODS DESCRIPTION"}.issubset(reader.fieldnames or []):
             raise ValueError(
-                f"CSV must contain 'hs_code' and 'description' columns. "
+                f"CSV must contain 'HS CODE' and 'GOODS DESCRIPTION' columns. "
                 f"Found: {reader.fieldnames}"
             )
 
@@ -62,31 +64,21 @@ def _parse_csv(text: str) -> list[dict]:
 
 
 def _build_objects(rows, hs_code_file):
-    from .models import Category
-
     objects = []
     skipped_blank = 0
-    category_cache: dict[str, Category] = {}
 
     for row in rows:
-        hs_code = row.get("hs_code", "").strip()
-        description = row.get("description", "").strip()
+        hs_code = row.get("HS CODE", "").strip()
+        description = row.get("GOODS DESCRIPTION", "").strip()
 
         if not hs_code or not description:
             skipped_blank += 1
             continue
 
-        chapter = hs_code[:2]
-        if chapter not in category_cache:
-            name = HS_CHAPTER_CATEGORIES.get(chapter, f"Chapter {chapter}")
-            category, _ = Category.objects.get_or_create(name=name)
-            category_cache[chapter] = category
-
         objects.append(
             HsCode(
                 hs_code=hs_code,
                 description=description,
-                category=category_cache[chapter],
                 hs_code_file=hs_code_file,
             )
         )

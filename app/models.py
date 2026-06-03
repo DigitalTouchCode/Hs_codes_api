@@ -1,8 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
-# from django.contrib.postgres.indexes import GinIndex
-# from django.contrib.postgres.operations import TrigramExtension
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.operations import TrigramExtension
 
 
 class User(AbstractUser):
@@ -21,7 +21,6 @@ class HsCodeFile(models.Model):
 
 class HsCode(models.Model):
     hs_code_file = models.ForeignKey(HsCodeFile, on_delete=models.CASCADE)
-    category = models.ForeignKey(Category, on_delete=models.CASCADE)
     hs_code = models.CharField(max_length=20)
     description = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
@@ -30,18 +29,15 @@ class HsCode(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["hs_code"], name="unique_hs_code")
         ]
-
-
-# class Meta:
-#     indexes = [
-#         GinIndex(
-#             fields=["hs_code"],
-#             opclasses=["gin_trgm_ops"],
-#             name="hscode_hs_code_trgm_idx"
-#         ),
-#         GinIndex(
-#             fields=["description"],
-#             opclasses=["gin_trgm_ops"],
-#             name="hscode_description_trgm_idx"
-#         ),
-#     ]
+        indexes = [
+            GinIndex(
+                fields=["hs_code"],
+                opclasses=["gin_trgm_ops"],
+                name="hscode_hs_code_trgm_idx",
+            ),
+            GinIndex(
+                fields=["description"],
+                opclasses=["gin_trgm_ops"],
+                name="hscode_description_trgm_idx",
+            ),
+        ]

@@ -19,6 +19,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.postgres",
     # third_party
     "rest_framework",
     # custom
@@ -108,3 +109,9 @@ REST_FRAMEWORK = {
         "user": "300/minute",
     },
 }
+
+HS_CODE_SEARCH_THRESHOLD = config(
+    "HS_CODE_SEARCH_THRESHOLD",
+    default=0.1,
+    cast=float,
+)
