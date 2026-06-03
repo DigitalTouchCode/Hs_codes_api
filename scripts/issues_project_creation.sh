@@ -10,7 +10,7 @@ echo " HS Code Search "
 echo "========================================"
 
 gh repo view $REPO > /dev/null 2>&1 || { echo "Cannot access repo"; exit 1; }
-echo "✓ Repo accessible"
+echo "Repo accessible"
 
 make_issue() {
   local TITLE="$1"
