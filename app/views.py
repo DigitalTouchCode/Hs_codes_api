@@ -42,7 +42,9 @@ class HsCodeUploadView(APIView):
 
 class HsCodeSearchView(generics.ListAPIView):
     serializer_class = HsCodeSerializer
-
+    authentication_classes = []
+    permission_classes = []
+    
     def get_queryset(self):
         try:
             q = self.request.query_params.get("q")

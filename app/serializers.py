@@ -11,7 +11,7 @@ class HsCodeFileSerializer(serializers.ModelSerializer):
 class HsCodeSerializer(serializers.ModelSerializer):
     class Meta:
         model = HsCode
-        fields = "__all__"
+        fields = ["id", "hs_code", "description", "created_at"]
 
 
 class CategorySerializer(serializers.ModelSerializer):

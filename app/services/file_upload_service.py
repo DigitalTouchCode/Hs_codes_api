@@ -2,9 +2,7 @@ import csv
 import io
 from dataclasses import dataclass
 
-from app.models import HsCode, HsCodeFile, Category
-from .category_service import HS_CHAPTER_CATEGORIES, get_or_create_category_for_hs_code
-
+from app.models import HsCode, HsCodeFile
 
 @dataclass
 class UploadResult:
