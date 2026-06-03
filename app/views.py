@@ -7,6 +7,7 @@ from rest_framework import generics
 from rest_framework.exceptions import ValidationError
 
 from .models import HsCode
+from django.db.models import Q
 
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser
