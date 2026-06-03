@@ -22,7 +22,7 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           script: |
             set -e
-            cd /Hs_codes_api
+            cd Hs_codes_api
 
             echo "Pulling latest code..."
             git pull origin main
