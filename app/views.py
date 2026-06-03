@@ -46,47 +46,34 @@ class HsCodeSearchView(generics.ListAPIView):
     permission_classes = []
     
     def get_queryset(self):
-        try:
-            q = self.request.query_params.get("q")
+      q = self.request.query_params.get("q", "").strip()
 
-            if not q:
-                logger.warning(
-                    "Missing search query | path={path}",
-                    path=self.request.path,
-                )
-                raise ValidationError({"q": ["This query parameter is required."]})
+      if not q:
+        raise ValidationError({"q": ["This query parameter is required."]})
 
-            threshold = getattr(
-                settings,
-                "HS_CODE_SEARCH_THRESHOLD",
-                0.1,
-            )
+      exact_qs = HsCode.objects.filter(
+        Q(description__icontains=q) | Q(hs_code__icontains=q)
+       )
 
-            logger.info(
-                "HS search executed | query={q} | threshold={threshold}",
-                q=q,
-                threshold=threshold,
-            )
+      if exact_qs.exists():
+        logger.info("HS search (exact) | query={q}", q=q)
+        return exact_qs.order_by("hs_code")
 
-            queryset = (
-                HsCode.objects.annotate(
-                    similarity=(
-                        TrigramSimilarity("description", q) * 2
-                        + TrigramSimilarity("hs_code", q)
-                    )
-                )
-                .filter(similarity__gte=threshold)
-                .order_by("-similarity")
-            )
-            return queryset
+      threshold = getattr(settings, "HS_CODE_SEARCH_THRESHOLD", 0.3)
 
-        except Exception as e:
-            logger.exception(
-                "HS search failed | query={q} | error={error}",
-                q=self.request.query_params.get("q"),
-                error=str(e),
-            )
-            raise
+      queryset = (
+        HsCode.objects.annotate(
+            similarity=TrigramSimilarity("description", q)
+        )
+        .filter(similarity__gte=threshold)
+        .order_by("-similarity")
+      )
+
+      logger.info(
+        "HS search (fuzzy) | query={q} | threshold={threshold}",
+        q=q, threshold=threshold,
+      )
+      return queryset
 
 
 class HealthCheckView(APIView):
