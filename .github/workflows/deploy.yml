@@ -11,7 +11,7 @@ jobs:
   deploy:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.3
@@ -23,22 +23,28 @@ jobs:
           script: |
             set -e
             cd /Hs_codes_api
-            echo "Pulling latest images..."
-            docker compose pull
-            echo "Starting updated containers..."
-            docker compose up -d
-            echo "Waiting for application..."
+
+            echo "Pulling latest code..."
+            git pull origin main
+
+            echo "Building and starting containers..."
+            docker compose up -d --build
+
+            echo "Waiting for application to start..."
             sleep 15
+
             echo "Running migrations..."
             docker compose exec -T web python manage.py migrate --noinput
+
             echo "Checking health endpoint..."
             for i in $(seq 1 20); do
               if curl -fsS http://localhost:8001/api/v1/health/ > /dev/null; then
                 echo "Health check passed"
                 exit 0
               fi
-              echo "Waiting for healthy container..."
+              echo "Attempt $i/20 â€” waiting..."
               sleep 5
             done
-            echo "Health check failed"
+
+            echo "Health check failed after 100s"
             exit 1
