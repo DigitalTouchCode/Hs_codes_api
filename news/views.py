@@ -1,14 +1,42 @@
+import logging
+
+from django.conf import settings
 from django.utils import timezone
-from rest_framework import viewsets, generics, permissions
+from rest_framework import viewsets, generics, permissions, pagination
+from rest_framework.response import Response
+from rest_framework import status
 
 from .models import Post, PushSubscription, NotificationEvent
 from .serializers import PostSerializer, PushSubscriptionSerializer, NotificationEventSerializer
 
+logger = logging.getLogger(__name__)
+
+
+def error_response(exc, default_message):
+    """Always logs the full traceback (visible in `docker logs`).
+    Only echoes the real exception message in the API response when
+    DEBUG=True — in production you get the detail in your logs, not
+    leaked to whoever's calling the API."""
+    logger.exception(default_message)
+    detail = str(exc) if settings.DEBUG else default_message
+    return Response({'detail': detail}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PostPagination(pagination.PageNumberPagination):
+    page_size = 9
+    page_size_query_param = 'page_size'
+    max_page_size = 30
+
 
 class PostViewSet(viewsets.ReadOnlyModelViewSet):
-    """GET /api/v1/news/posts/            -> all published posts
-       GET /api/v1/news/posts/?category=technology -> filtered"""
+    """GET /api/v1/news/posts/                       -> page 1, 9 posts
+       GET /api/v1/news/posts/?page=2                 -> next page
+       GET /api/v1/news/posts/?category=technology    -> filtered + paginated
+       Response shape: {"count", "next", "previous", "results"} — the
+       frontend's infinite scroll follows `next` directly, so pagination
+       params never need to be constructed by hand on either side."""
     serializer_class = PostSerializer
+    pagination_class = PostPagination
     permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
@@ -18,6 +46,18 @@ class PostViewSet(viewsets.ReadOnlyModelViewSet):
             qs = qs.filter(category__iexact=category)
         return qs
 
+    def list(self, request, *args, **kwargs):
+        try:
+            return super().list(request, *args, **kwargs)
+        except Exception as exc:
+            return error_response(exc, 'Failed to list posts')
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            return super().retrieve(request, *args, **kwargs)
+        except Exception as exc:
+            return error_response(exc, 'Failed to retrieve post')
+
 
 class PushSubscriptionCreateView(generics.CreateAPIView):
     """POST /api/v1/news/push-subscriptions/
@@ -25,6 +65,12 @@ class PushSubscriptionCreateView(generics.CreateAPIView):
     queryset = PushSubscription.objects.all()
     serializer_class = PushSubscriptionSerializer
     permission_classes = [permissions.AllowAny]
+
+    def create(self, request, *args, **kwargs):
+        try:
+            return super().create(request, *args, **kwargs)
+        except Exception as exc:
+            return error_response(exc, 'Failed to create push subscription')
 
 
 class NotificationEventUpdateView(generics.UpdateAPIView):
@@ -43,4 +89,11 @@ class NotificationEventUpdateView(generics.UpdateAPIView):
         elif new_status == 'clicked':
             extra['clicked_at'] = timezone.now()
         serializer.save(**extra)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            return super().update(request, *args, **kwargs)
+        except Exception as exc:
+            return error_response(exc, 'Failed to update notification event')
+
 
