@@ -18,6 +18,21 @@ services:
     networks:
       - backend
 
+  redis:
+    image: redis:7-alpine
+    container_name: hs_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - backend
+
   web:
     build:
       context: .
@@ -28,6 +43,8 @@ services:
       - .env
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     ports:
       - "8001:8001"
@@ -46,8 +63,43 @@ services:
     networks:
       - backend
 
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hs_celery_worker
+    restart: unless-stopped
+    command: celery -A core worker -l info -Q celery --hostname=default@%h
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+
+  worker_news:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hs_celery_worker_news
+    restart: unless-stopped
+    command: celery -A core worker -l info -Q news_push --hostname=news@%h --concurrency=2
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
   backend:

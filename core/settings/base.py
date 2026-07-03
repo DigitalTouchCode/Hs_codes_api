@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from decouple import config, Csv
 
@@ -117,3 +118,13 @@ HS_CODE_SEARCH_THRESHOLD = config(
     default=0.1,
     cast=float,
 )
+
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'Africa/Harare'
+CELERY_TASK_ROUTES = {
+    'newsapp.tasks.send_push_for_post': {'queue': 'news_push'},
+}
