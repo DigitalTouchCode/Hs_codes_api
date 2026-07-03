@@ -3,7 +3,7 @@ from .models import Post, PushSubscription, NotificationEvent
 
 
 class PostSerializer(serializers.ModelSerializer):
-    date = serializers.DateField(source='published_at', format='%Y-%m-%d', read_only=True)
+    date = serializers.DateTimeField(source='published_at', format='%Y-%m-%d', read_only=True)
     category = serializers.SerializerMethodField()
 
     class Meta:
