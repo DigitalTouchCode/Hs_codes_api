@@ -9,7 +9,7 @@ DATABASE_URL = config("DATABASE_URL")
 
 DATABASES = {"default": dj_database_url.parse(DATABASE_URL)}
 
-CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS", cast=Csv(), default="").split(",")
+CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS", cast=Csv(), default="")
 
 # Production DRF throttling
 REST_FRAMEWORK = {
