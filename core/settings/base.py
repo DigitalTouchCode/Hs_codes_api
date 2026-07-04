@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     "django.contrib.postgres",
     # third_party
     "rest_framework",
+    "corsheaders",
     # custom
     "app",
     "event",
@@ -34,6 +35,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    ""corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -146,3 +148,5 @@ EMAIL_USE_TLS = config("EMAIL_USE_TLS", cast=bool, default=False)
 EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="DigitalTouch News <info@digitaltouch.co.zw>")
+
+CORS_ALLOW_ALL_ORIGINS = True
