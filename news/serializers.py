@@ -1,8 +1,10 @@
+from django.utils import timezone
 from rest_framework import serializers
-from .models import Post, PushSubscription, NotificationEvent
+from .models import Post, PushSubscription, NotificationEvent, Subscriber
 
 
 class PostSerializer(serializers.ModelSerializer):
+    """Public, read-only — what news.html actually consumes."""
     date = serializers.DateTimeField(source='published_at', format='%Y-%m-%d', read_only=True)
     category = serializers.SerializerMethodField()
 
@@ -16,17 +18,46 @@ class PostSerializer(serializers.ModelSerializer):
         return obj.get_category_display()
 
 
-class PushSubscriptionSerializer(serializers.ModelSerializer):
+class PostWriteSerializer(serializers.ModelSerializer):
+    """Admin-only — full read/write, used by the compose page. `category`
+    here is the raw choice value ('technology'), matching a <select>'s
+    option values, not the display label."""
+
     class Meta:
-        model = PushSubscription
-        fields = ['id', 'endpoint', 'p256dh', 'auth', 'session_id']
+        model = Post
+        fields = ['id', 'title', 'slug', 'category', 'excerpt', 'content', 'featured', 'is_published', 'published_at']
+        read_only_fields = ['id']
 
     def create(self, validated_data):
+        if validated_data.get('is_published') and not validated_data.get('published_at'):
+            validated_data['published_at'] = timezone.now()
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        # Publishing for the first time stamps published_at now, even if
+        # the post was drafted days earlier.
+        if validated_data.get('is_published') and not instance.published_at:
+            validated_data['published_at'] = timezone.now()
+        return super().update(instance, validated_data)
+
+
+class PushSubscriptionSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(write_only=True, required=False, allow_blank=True)
+
+    class Meta:
+        model = PushSubscription
+        fields = ['id', 'endpoint', 'p256dh', 'auth', 'session_id', 'email']
+
+    def create(self, validated_data):
+        email = validated_data.pop('email', None)
+        subscriber = None
+        if email:
+            subscriber, _ = Subscriber.objects.get_or_create(email=email)
         # Re-subscribing with the same endpoint just reactivates it rather
         # than creating a duplicate row.
         obj, _ = PushSubscription.objects.update_or_create(
             endpoint=validated_data['endpoint'],
-            defaults={**validated_data, 'is_active': True},
+            defaults={**validated_data, 'is_active': True, 'subscriber': subscriber},
         )
         return obj
 

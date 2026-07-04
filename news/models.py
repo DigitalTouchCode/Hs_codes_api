@@ -30,6 +30,19 @@ class Post(models.Model):
         return self.title
 
 
+class Subscriber(models.Model):
+    """A person identified via Google Sign-In. Linking push subscriptions
+    to a real identity (rather than an anonymous browser endpoint) means
+    you can see who's actually subscribed, not just how many devices."""
+    email = models.EmailField(unique=True)
+    google_sub = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    name = models.CharField(max_length=150, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.email
+
+
 class PushSubscription(models.Model):
     """One browser push endpoint. Created when a visitor taps
     'Enable notifications' and the frontend POSTs the PushSubscription
@@ -39,6 +52,7 @@ class PushSubscription(models.Model):
     p256dh = models.CharField(max_length=200)
     auth = models.CharField(max_length=100)
     session_id = models.CharField(max_length=100, blank=True, null=True)
+    subscriber = models.ForeignKey(Subscriber, on_delete=models.SET_NULL, null=True, blank=True, related_name='push_subscriptions')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -69,3 +83,4 @@ class NotificationEvent(models.Model):
 
     def __str__(self):
         return f"post={self.post_id} sub={self.subscription_id} ({self.status})"
+
