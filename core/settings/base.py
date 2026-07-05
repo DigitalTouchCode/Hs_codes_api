@@ -149,4 +149,4 @@ EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="DigitalTouch News <info@digitaltouch.co.zw>")
 
-CORS_ALLOW_ALL_ORIGINS = True
+GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID", default="")
