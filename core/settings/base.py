@@ -31,7 +31,8 @@ INSTALLED_APPS = [
     # custom
     "app",
     "event",
-    "news"
+    "news",
+    "pos",
 ]
 
 MIDDLEWARE = [
@@ -108,6 +109,9 @@ MEDIA_ROOT = BASE_DIR / "media"
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",
+        # Added for the pos app — additive, existing session-authenticated
+        # views (app, event, news) are unaffected.
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
@@ -117,6 +121,14 @@ REST_FRAMEWORK = {
         "anon": "60/minute",
         "user": "300/minute",
     },
+}
+
+from datetime import timedelta  # noqa: E402
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=1),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=14),
+    "ROTATE_REFRESH_TOKENS": True,
 }
 
 HS_CODE_SEARCH_THRESHOLD = config(
