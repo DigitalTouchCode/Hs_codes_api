@@ -66,11 +66,6 @@ class TenantScopedModel(models.Model):
     class Meta:
         abstract = True
 
-
-# ---------------------------------------------------------------------------
-# Mutable, editable records — last-write-wins conflict resolution on sync.
-# ---------------------------------------------------------------------------
-
 class Branch(TenantScopedModel):
     name = models.CharField(max_length=255)
 
@@ -117,13 +112,6 @@ class Customer(TenantScopedModel):
 
     def __str__(self):
         return self.name
-
-
-# ---------------------------------------------------------------------------
-# Append-only ledger — never updated in place, only created. This is what
-# makes concurrent offline writers (two branches, or two terminals at one
-# branch) safe: every sale is a new row, so there's nothing to conflict over.
-# ---------------------------------------------------------------------------
 
 class Sale(TenantScopedModel):
     branch = models.ForeignKey(Branch, on_delete=models.PROTECT, related_name="sales")
