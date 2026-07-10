@@ -7,25 +7,39 @@ class PostSerializer(serializers.ModelSerializer):
     """Public, read-only — what news.html actually consumes."""
     date = serializers.DateTimeField(source='published_at', format='%Y-%m-%d', read_only=True)
     category = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
-        fields = ['id', 'title', 'slug', 'category', 'excerpt', 'content', 'featured', 'date']
+        fields = ['id', 'title', 'slug', 'category', 'excerpt', 'content', 'image', 'featured', 'date']
 
     def get_category(self, obj):
         # Returns the human-readable label ("Technology") to match the
         # frontend's CATEGORY_ORDER exactly.
         return obj.get_category_display()
 
+    def get_image(self, obj):
+        if not obj.image:
+            return None
+        request = self.context.get('request')
+        url = obj.image.url
+        return request.build_absolute_uri(url) if request else url
+
 
 class PostWriteSerializer(serializers.ModelSerializer):
     """Admin-only — full read/write, used by the compose page. `category`
     here is the raw choice value ('technology'), matching a <select>'s
-    option values, not the display label."""
+    option values, not the display label. `image` accepts an uploaded
+    file via multipart/form-data."""
+
+    # binary=True makes this parse a JSON string into a real list — needed
+    # because multipart/form-data (used for the image upload) sends every
+    # field as plain text, unlike a JSON request body.
+    content = serializers.JSONField(binary=True)
 
     class Meta:
         model = Post
-        fields = ['id', 'title', 'slug', 'category', 'excerpt', 'content', 'featured', 'is_published', 'published_at']
+        fields = ['id', 'title', 'slug', 'category', 'excerpt', 'content', 'image', 'featured', 'is_published', 'published_at']
         read_only_fields = ['id']
 
     def create(self, validated_data):
@@ -67,4 +81,5 @@ class NotificationEventSerializer(serializers.ModelSerializer):
         model = NotificationEvent
         fields = ['id', 'status', 'sent_at', 'delivered_at', 'clicked_at']
         read_only_fields = ['sent_at']
+
 

@@ -18,6 +18,7 @@ class Post(models.Model):
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
     excerpt = models.CharField(max_length=300)
     content = models.JSONField(help_text="List of paragraph strings, rendered as-is on the frontend")
+    image = models.ImageField(upload_to='news/%Y/%m/', blank=True, null=True)
     featured = models.BooleanField(default=False)
     is_published = models.BooleanField(default=False)
     published_at = models.DateTimeField(null=True, blank=True)
@@ -83,4 +84,3 @@ class NotificationEvent(models.Model):
 
     def __str__(self):
         return f"post={self.post_id} sub={self.subscription_id} ({self.status})"
-

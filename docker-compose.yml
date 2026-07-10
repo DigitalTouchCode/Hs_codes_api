@@ -33,6 +33,7 @@ services:
     networks:
       - backend
 
+
   web:
     build:
       context: .
@@ -47,7 +48,7 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "8001:8001"
+      - "127.0.0.1:8001:8001"
     healthcheck:
       test:
         [
@@ -62,6 +63,8 @@ services:
       start_period: 30s
     networks:
       - backend
+    volumes:
+      - /home/deploy/xyz/media:/app/media
 
   worker:
     build:
@@ -100,6 +103,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  media_data:
 
 networks:
   backend:
