@@ -29,3 +29,4 @@ pywebpush==2.0.0
 cryptography==42.0.8
 google-auth==2.36.0
 pillow
+bleach
