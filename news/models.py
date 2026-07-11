@@ -38,6 +38,7 @@ class Subscriber(models.Model):
     email = models.EmailField(unique=True)
     google_sub = models.CharField(max_length=64, unique=True, null=True, blank=True)
     name = models.CharField(max_length=150, blank=True)
+    is_subscribed = models.BooleanField(default=True, help_text="False once they unsubscribe from newsletter emails")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

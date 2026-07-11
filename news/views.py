@@ -2,7 +2,7 @@ import logging
 
 from django.conf import settings
 from django.utils import timezone
-from rest_framework import viewsets, generics, permissions, pagination, status
+from rest_framework import viewsets, generics, permissions, pagination, status, parsers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from google.oauth2 import id_token as google_id_token
@@ -12,8 +12,9 @@ from .auth import issue_admin_token, SignedTokenAuthentication
 from .models import Post, PushSubscription, NotificationEvent, Subscriber
 from .serializers import (
     PostSerializer, PostWriteSerializer, PushSubscriptionSerializer, NotificationEventSerializer,
+    SubscriberSerializer, NewsletterSendSerializer,
 )
-from .tasks import send_push_for_post, send_thank_you_email
+from .tasks import send_push_for_post, send_thank_you_email, send_newsletter
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +115,7 @@ class AdminPostViewSet(viewsets.ModelViewSet):
     serializer_class = PostWriteSerializer
     authentication_classes = [SignedTokenAuthentication]
     permission_classes = [permissions.IsAdminUser]
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
 
     def create(self, request, *args, **kwargs):
         try:
@@ -180,3 +182,54 @@ class NotificationEventUpdateView(generics.UpdateAPIView):
         except Exception as exc:
             return error_response(exc, 'Failed to update notification event')
 
+
+class SubscriberListView(generics.ListAPIView):
+    """GET /api/v1/news/admin/subscribers/ — admin-only, read-only.
+       Powers the 'Subscribers' tab in the compose page."""
+    queryset = Subscriber.objects.all().order_by('-created_at')
+    serializer_class = SubscriberSerializer
+    authentication_classes = [SignedTokenAuthentication]
+    permission_classes = [permissions.IsAdminUser]
+
+
+class NewsletterSendView(APIView):
+    """POST /api/v1/news/admin/newsletter/
+       Body: {"post_ids": [1, 2], "subject": "...", "intro": "optional"}
+       Bundles the given posts into one email and sends it to every
+       subscribed Subscriber. Admin-only."""
+    authentication_classes = [SignedTokenAuthentication]
+    permission_classes = [permissions.IsAdminUser]
+
+    def post(self, request):
+        serializer = NewsletterSendSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        posts = list(Post.objects.filter(id__in=data['post_ids'], is_published=True))
+        if not posts:
+            return Response({'detail': 'No matching published posts found'}, status=status.HTTP_400_BAD_REQUEST)
+
+        recipient_count = Subscriber.objects.filter(is_subscribed=True).count()
+        send_newsletter.delay(
+            post_ids=[p.id for p in posts],
+            subject=data['subject'],
+            intro=data.get('intro', ''),
+        )
+        return Response({'queued': True, 'post_count': len(posts), 'recipient_count': recipient_count})
+
+
+class UnsubscribeView(APIView):
+    """GET /api/v1/news/unsubscribe/<token>/ — public, no auth. Every
+       newsletter email links here with a per-subscriber signed token."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def get(self, request, token):
+        from django.core import signing
+        try:
+            data = signing.loads(token, salt='newsapp.unsubscribe', max_age=60 * 60 * 24 * 30)
+        except signing.BadSignature:
+            return Response({'detail': 'Invalid or expired unsubscribe link'}, status=status.HTTP_400_BAD_REQUEST)
+
+        Subscriber.objects.filter(id=data.get('subscriber_id')).update(is_subscribed=False)
+        return Response({'detail': 'You have been unsubscribed from DigitalTouch News emails.'})

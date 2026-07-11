@@ -1,6 +1,14 @@
+import bleach
 from django.utils import timezone
 from rest_framework import serializers
 from .models import Post, PushSubscription, NotificationEvent, Subscriber
+
+ALLOWED_TAGS = ['b', 'strong', 'i', 'em', 'u', 'a', 'ul', 'ol', 'li', 'br']
+ALLOWED_ATTRS = {'a': ['href', 'target', 'rel']}
+
+
+def sanitize_paragraph(html):
+    return bleach.clean(html, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS, strip=True)
 
 
 class PostSerializer(serializers.ModelSerializer):
@@ -43,11 +51,15 @@ class PostWriteSerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
     def create(self, validated_data):
+        if 'content' in validated_data:
+            validated_data['content'] = [sanitize_paragraph(p) for p in validated_data['content']]
         if validated_data.get('is_published') and not validated_data.get('published_at'):
             validated_data['published_at'] = timezone.now()
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
+        if 'content' in validated_data:
+            validated_data['content'] = [sanitize_paragraph(p) for p in validated_data['content']]
         # Publishing for the first time stamps published_at now, even if
         # the post was drafted days earlier.
         if validated_data.get('is_published') and not instance.published_at:
@@ -82,4 +94,15 @@ class NotificationEventSerializer(serializers.ModelSerializer):
         fields = ['id', 'status', 'sent_at', 'delivered_at', 'clicked_at']
         read_only_fields = ['sent_at']
 
+
+class SubscriberSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Subscriber
+        fields = ['id', 'email', 'name', 'is_subscribed', 'created_at']
+
+
+class NewsletterSendSerializer(serializers.Serializer):
+    post_ids = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
+    subject = serializers.CharField(max_length=200)
+    intro = serializers.CharField(required=False, allow_blank=True, default='')
 

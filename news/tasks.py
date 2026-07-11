@@ -23,8 +23,8 @@ def send_thank_you_email(subscriber_id):
     text_body = (
         f"Hi {first_name},\n\n"
         "Thanks for signing up for DigitalTouch News. You'll hear from us "
-        "whenever we publish good Tech News., "
-        "\n\n"
+        "whenever we publish product updates, ZIMRA compliance changes, "
+        "or anything else worth sharing.\n\n"
         "— The DigitalTouch team\n"
         "https://news.digitaltouch.co.zw"
     )
@@ -58,6 +58,60 @@ def send_thank_you_email(subscriber_id):
     )
     msg.attach_alternative(html_body, 'text/html')
     msg.send(fail_silently=False)
+
+
+@shared_task
+def send_newsletter(post_ids, subject, intro=''):
+    """Bundles the given posts into one email and sends it to every
+    subscriber who hasn't unsubscribed. Sent one at a time (not BCC) so
+    each email carries a unique, working unsubscribe link."""
+    from django.core import signing
+
+    posts = list(Post.objects.filter(id__in=post_ids, is_published=True))
+    if not posts:
+        return
+
+    posts_html = ''
+    posts_text = ''
+    for p in posts:
+        img_tag = (
+            f'<img src="{p.image.url}" style="width:100%; border-radius:10px; margin-bottom:10px;">'
+            if p.image else ''
+        )
+        posts_html += f"""
+        <div style="margin-bottom:28px;">
+          {img_tag}
+          <h3 style="font-size:17px; margin:0 0 6px;">{p.title}</h3>
+          <p style="font-size:14px; color:#555; line-height:1.5; margin:0 0 8px;">{p.excerpt}</p>
+          <a href="https://news.digitaltouch.co.zw/#{p.slug}" style="color:#0073e6; font-size:13px; text-decoration:none;">Read more &rarr;</a>
+        </div>
+        """
+        posts_text += f"{p.title}\n{p.excerpt}\nhttps://news.digitaltouch.co.zw/#{p.slug}\n\n"
+
+    for subscriber in Subscriber.objects.filter(is_subscribed=True):
+        unsub_token = signing.dumps({'subscriber_id': subscriber.id}, salt='newsapp.unsubscribe')
+        unsub_url = f'https://api.afrerp.co.zw/api/v1/news/unsubscribe/{unsub_token}/'
+
+        text_body = f"{intro}\n\n{posts_text}\n---\nUnsubscribe: {unsub_url}"
+        html_body = f"""
+        <div style="font-family: -apple-system, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; color: #1d1d1f;">
+          {f'<p style="font-size:15px; line-height:1.6;">{intro}</p>' if intro else ''}
+          {posts_html}
+          <p style="font-size: 11px; color: #aeaeb2; margin-top: 30px;">
+            DigitalTouch &middot; Harare, Zimbabwe &middot;
+            <a href="{unsub_url}" style="color:#aeaeb2;">Unsubscribe</a>
+          </p>
+        </div>
+        """
+
+        msg = EmailMultiAlternatives(
+            subject=subject,
+            body=text_body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[subscriber.email],
+        )
+        msg.attach_alternative(html_body, 'text/html')
+        msg.send(fail_silently=True)  # one bad address shouldn't kill the whole send
 
 
 @shared_task
@@ -97,4 +151,3 @@ def send_push_for_post(post_id):
             if status_code in (404, 410):
                 sub.is_active = False
                 sub.save(update_fields=['is_active'])
-
