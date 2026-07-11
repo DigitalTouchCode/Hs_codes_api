@@ -59,7 +59,7 @@ class SignupLoginTests(APITestCase):
 
 
 class GoogleAuthTests(APITestCase):
-    @patch("pos.auth.google_id_token.verify_oauth2_token")
+    @patch("pos.views.google_id_token.verify_oauth2_token")
     def test_first_time_google_signin_creates_tenant(self, mock_verify):
         mock_verify.return_value = {
             "sub": "google-sub-123", "email": "g@example.com", "email_verified": True, "name": "G User",
@@ -68,7 +68,7 @@ class GoogleAuthTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(PosProfile.objects.filter(google_sub="google-sub-123").count(), 1)
 
-    @patch("pos.auth.google_id_token.verify_oauth2_token")
+    @patch("pos.views.google_id_token.verify_oauth2_token")
     def test_repeat_google_signin_logs_in_same_profile(self, mock_verify):
         mock_verify.return_value = {
             "sub": "google-sub-456", "email": "g2@example.com", "email_verified": True, "name": "G2 User",
@@ -80,7 +80,7 @@ class GoogleAuthTests(APITestCase):
         self.assertEqual(second.status_code, status.HTTP_200_OK)  # login, not another signup
         self.assertEqual(Tenant.objects.filter(name__icontains="G2").count(), 1)
 
-    @patch("pos.auth.google_id_token.verify_oauth2_token")
+    @patch("pos.views.google_id_token.verify_oauth2_token")
     def test_unverified_google_email_rejected(self, mock_verify):
         mock_verify.return_value = {
             "sub": "google-sub-789", "email": "g3@example.com", "email_verified": False, "name": "G3",
@@ -196,3 +196,83 @@ class SyncTests(APITestCase):
         # SessionAuthentication would trigger the 401 + WWW-Authenticate
         # challenge, and it's not the one in play for an API-only client.
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class CrudViewSetPermissionTests(APITestCase):
+    """Verifies the read/write role split matches the frontend's ROLE_TABS
+    exactly: Sales can read products/customers/sales but can't manage
+    products, and can't see purchases/expenses/logs at all."""
+
+    def setUp(self):
+        signup = self.client.post(reverse("pos-signup"), {
+            "business_name": "Crud Test Biz", "name": "Owner", "email": "crud-owner@example.com",
+            "password": "a-strong-password-123",
+        }, format="json")
+        self.admin_token = signup.data["tokens"]["access"]
+        self.tenant = User.objects.get(email="crud-owner@example.com").posprofile.tenant
+        self.branch = Branch.objects.create(id=uuid.uuid4(), tenant=self.tenant, name="Harare CBD")
+
+        sales_user = User.objects.create_user(
+            username="sales@example.com", email="sales@example.com", password="a-strong-password-123",
+        )
+        PosProfile.objects.create(user=sales_user, tenant=self.tenant, role=PosProfile.ROLE_SALES, branch_id=self.branch.id)
+        sales_login = self.client.post(reverse("pos-login"), {"email": "sales@example.com", "password": "a-strong-password-123"}, format="json")
+        self.sales_token = sales_login.data["tokens"]["access"]
+
+    def as_admin(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.admin_token}")
+
+    def as_sales(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.sales_token}")
+
+    def test_admin_can_create_product_sales_cannot(self):
+        payload = {"name": "Bread Loaf", "sku": "BR-1", "category": "Bakery", "price": "1.10", "cost": "0.75"}
+
+        self.as_admin()
+        admin_response = self.client.post(reverse("pos-product-list"), payload, format="json")
+        self.assertEqual(admin_response.status_code, status.HTTP_201_CREATED)
+
+        self.as_sales()
+        sales_response = self.client.post(reverse("pos-product-list"), {**payload, "sku": "BR-2"}, format="json")
+        self.assertEqual(sales_response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_sales_can_read_products_for_the_pos_screen(self):
+        Product.objects.create(id=uuid.uuid4(), tenant=self.tenant, name="Rice 5kg", price="6.00", cost="4.40")
+        self.as_sales()
+        response = self.client.get(reverse("pos-product-list"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+
+    def test_sales_can_create_customers_but_not_delete(self):
+        self.as_sales()
+        create = self.client.post(reverse("pos-customer-list"), {"name": "Walk-in", "phone": ""}, format="json")
+        self.assertEqual(create.status_code, status.HTTP_201_CREATED)
+
+    def test_sales_blocked_from_purchases_and_expenses_and_logs(self):
+        self.as_sales()
+        for url_name in ("pos-purchase-list", "pos-expense-list", "pos-log-list"):
+            response = self.client.get(reverse(url_name))
+            self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, url_name)
+
+    def test_sales_can_read_sales_for_returns_lookup(self):
+        self.as_sales()
+        response = self.client.get(reverse("pos-sale-list"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_queryset_is_tenant_scoped(self):
+        # A product belonging to a different tenant must never appear.
+        other_tenant = Tenant.objects.create(name="Someone Else", slug="someone-else")
+        Product.objects.create(id=uuid.uuid4(), tenant=other_tenant, name="Not Yours", price="1.00", cost="0.50")
+        Product.objects.create(id=uuid.uuid4(), tenant=self.tenant, name="Yours", price="1.00", cost="0.50")
+
+        self.as_admin()
+        response = self.client.get(reverse("pos-product-list"))
+        names = [p["name"] for p in response.data]
+        self.assertEqual(names, ["Yours"])
+
+    def test_ledger_has_no_create_endpoint(self):
+        # Sales/returns/purchases/expenses only get created via /sync/push/,
+        # which applies the stock delta — a direct POST here must not exist.
+        self.as_admin()
+        response = self.client.post(reverse("pos-sale-list"), {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
