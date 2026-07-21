@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from django.utils.text import slugify
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
@@ -11,15 +12,16 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import (
-    ActivityLog, Branch, Customer, Expense, PosProfile, Product, ProductStock,
+    ActivityLog, Branch, Customer, Expense, PosInvite, PosProfile, Product, ProductStock,
     Purchase, Return, Sale, Tenant,
 )
 from .permissions import HasPosRole, IsPosMember, TenantScopedQuerysetMixin
 from .serializers import (
-    ActivityLogSerializer, BranchSerializer, CustomerSerializer, ExpenseSerializer,
-    GoogleAuthSerializer, LoginSerializer, PosProfileSerializer, ProductSerializer,
-    ProductStockSerializer, PurchaseSerializer, ReturnSerializer, SaleSerializer,
-    SignupSerializer, unique_slug_for,
+    ActivityLogSerializer, BranchSerializer, CustomerSerializer, DirectUserCreateSerializer,
+    ExpenseSerializer, GoogleAuthSerializer, InviteAcceptSerializer, InviteCreateSerializer,
+    InvitePublicSerializer, LoginSerializer, PosProfileSerializer, ProductSerializer,
+    ProductStockSerializer, PurchaseSerializer, ReturnSerializer, RosterEntrySerializer,
+    SaleSerializer, SignupSerializer, unique_slug_for,
 )
 
 User = get_user_model()
@@ -146,6 +148,154 @@ class MeView(APIView):
 
 
 # ---------------------------------------------------------------------------
+# Invites & roster
+#
+# Adding a teammate has two paths from Settings > Users & roles:
+#   - Invite by email: admin picks role/branch, we hand back a link
+#     containing a token; the invitee opens it, sets their own name and
+#     password (InviteAcceptView), and gets a real login. No email is sent
+#     server-side — the admin shares the link the same way receipts already
+#     get shared, over WhatsApp/etc.
+#   - Add user with password: admin sets the password directly and the
+#     teammate can log in immediately, no separate acceptance step.
+# Both are restricted to admins of the tenant.
+# ---------------------------------------------------------------------------
+
+class InviteCreateView(APIView):
+    """POST /api/v1/pos/auth/invite/  (admin)
+       Body: {email, role, branch} -> {token, email, role, branch, expires_at}"""
+
+    permission_classes = [IsAuthenticated, IsPosMember, HasPosRole(PosProfile.ROLE_ADMIN)]
+
+    def post(self, request):
+        serializer = InviteCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        invite = PosInvite.objects.create(
+            tenant=request.user.posprofile.tenant,
+            invited_by=request.user,
+            **serializer.validated_data,
+        )
+        return Response(
+            {
+                "token": invite.token,
+                "email": invite.email,
+                "role": invite.role,
+                "branch": invite.branch_id,
+                "expires_at": invite.expires_at,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class InviteDetailView(APIView):
+    """GET /api/v1/pos/auth/invite/<token>/  (public)
+       Lets the invite-accept screen show "you're joining X as a Y" before
+       the person creates a password."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request, token):
+        invite = PosInvite.objects.filter(token=token).select_related("tenant").first()
+        if not invite or invite.status != PosInvite.STATUS_PENDING or invite.is_expired:
+            return Response({"detail": "This invite link isn't valid or has expired."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(InvitePublicSerializer(invite).data)
+
+
+class InviteAcceptView(APIView):
+    """POST /api/v1/pos/auth/invite/accept/  (public)
+       Body: {token, name, password} -> {tokens, user}, same shape as login/signup."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        serializer = InviteAcceptSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        token = serializer.validated_data["token"]
+
+        invite = PosInvite.objects.filter(token=token).select_related("tenant").first()
+        if not invite or invite.status != PosInvite.STATUS_PENDING or invite.is_expired:
+            return Response({"detail": "This invite link isn't valid or has expired."}, status=status.HTTP_400_BAD_REQUEST)
+        if User.objects.filter(email__iexact=invite.email).exists():
+            return Response({"detail": "An account with this email already exists."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.create_user(
+            username=invite.email,
+            email=invite.email,
+            password=serializer.validated_data["password"],
+            first_name=serializer.validated_data["name"],
+        )
+        profile = PosProfile.objects.create(
+            user=user, tenant=invite.tenant, role=invite.role, branch_id=invite.branch_id,
+        )
+        invite.status = PosInvite.STATUS_ACCEPTED
+        invite.accepted_at = timezone.now()
+        invite.save(update_fields=["status", "accepted_at"])
+
+        return Response(
+            {"user": PosProfileSerializer(profile).data, "tokens": tokens_for_user(user)},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class UsersView(APIView):
+    """GET  /api/v1/pos/auth/users/  (admin or manager) — roster: active
+         PosProfiles plus outstanding PosInvites for this tenant, so
+         Settings > Users & roles reflects real server state instead of
+         only what happened in this browser.
+       POST /api/v1/pos/auth/users/  (admin) — {name, email, password, role,
+         branch} -> {user}. Creates a real login immediately, no
+         acceptance step (the alternative to inviting by email)."""
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [IsAuthenticated(), IsPosMember(), HasPosRole(PosProfile.ROLE_ADMIN)()]
+        return [IsAuthenticated(), IsPosMember(), HasPosRole(PosProfile.ROLE_ADMIN, PosProfile.ROLE_MANAGER)()]
+
+    def get(self, request):
+        tenant = request.user.posprofile.tenant
+        active = [
+            {
+                "id": profile.user.email,
+                "name": profile.user.first_name or profile.user.email,
+                "email": profile.user.email,
+                "role": profile.role,
+                "branch_id": profile.branch_id,
+                "status": "active",
+            }
+            for profile in PosProfile.objects.filter(tenant=tenant).select_related("user")
+        ]
+        invited = [
+            {
+                "id": f"invite:{invite.id}",
+                "name": invite.email,
+                "email": invite.email,
+                "role": invite.role,
+                "branch_id": invite.branch_id,
+                "status": "invited",
+            }
+            for invite in PosInvite.objects.filter(tenant=tenant, status=PosInvite.STATUS_PENDING)
+            if not invite.is_expired
+        ]
+        roster = RosterEntrySerializer(active + invited, many=True).data
+        return Response(roster)
+
+    def post(self, request):
+        serializer = DirectUserCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        user = User.objects.create_user(
+            username=data["email"], email=data["email"], password=data["password"], first_name=data["name"],
+        )
+        profile = PosProfile.objects.create(
+            user=user, tenant=request.user.posprofile.tenant, role=data["role"], branch_id=data.get("branch_id"),
+        )
+        return Response({"user": PosProfileSerializer(profile).data}, status=status.HTTP_201_CREATED)
+
+
+# ---------------------------------------------------------------------------
 # CRUD viewsets for direct querying/management outside the sync flow (a
 # reporting dashboard, admin tooling, future integrations). The POS
 # terminal itself should keep using /sync/pull/ and /sync/push/, which
@@ -157,8 +307,7 @@ class MeView(APIView):
 # products and customers (they need that to ring up a sale and process
 # returns) but can't create/edit them; Purchases/Expenses/Logs are hidden
 # from Sales entirely, matching the frontend nav.
-# ---------------------------------------------------------------------------
-
+# ----------------------
 class TenantScopedReadWriteViewSet(TenantScopedQuerysetMixin, viewsets.ModelViewSet):
     """Read is open to any POS member of the tenant; write (create/update/
     destroy) is restricted to `write_roles`. Subclasses set `write_roles`."""

@@ -1,12 +1,13 @@
 from django.contrib import admin
 
 from pos.models import (
-    ActivityLog, Branch, Customer, Expense, PosProfile, Product, ProductStock,
+    ActivityLog, Branch, Customer, Expense, PosInvite, PosProfile, Product, ProductStock,
     Purchase, Return, Sale, Tenant,
 )
 
 admin.site.register(Tenant)
 admin.site.register(PosProfile)
+admin.site.register(PosInvite)
 admin.site.register(Branch)
 admin.site.register(Product)
 admin.site.register(ProductStock)

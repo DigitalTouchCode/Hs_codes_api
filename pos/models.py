@@ -1,7 +1,10 @@
+import secrets
 import uuid
+from datetime import timedelta
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 class Tenant(models.Model):
@@ -50,6 +53,54 @@ class PosProfile(models.Model):
 
     def __str__(self):
         return f"{self.user} @ {self.tenant} ({self.role})"
+
+
+def default_invite_expiry():
+    return timezone.now() + timedelta(days=7)
+
+
+def generate_invite_token():
+    return secrets.token_urlsafe(32)
+
+
+class PosInvite(models.Model):
+    """An outstanding invitation for someone to join an existing tenant with
+    a given role/branch. Created by an admin (POST /auth/invite/); the
+    recipient follows a link containing `token` to set their own password
+    and, on success, gets a real User + PosProfile (POST /auth/invite/accept/).
+    No email is sent server-side yet — the admin shares the link directly
+    (matches the existing WhatsApp-share pattern already used for receipts)."""
+
+    STATUS_PENDING = "pending"
+    STATUS_ACCEPTED = "accepted"
+    STATUS_REVOKED = "revoked"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_ACCEPTED, "Accepted"),
+        (STATUS_REVOKED, "Revoked"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="invites")
+    email = models.EmailField()
+    role = models.CharField(max_length=20, choices=PosProfile.ROLE_CHOICES, default=PosProfile.ROLE_SALES)
+    branch_id = models.UUIDField(null=True, blank=True)
+    token = models.CharField(max_length=64, unique=True, db_index=True, default=generate_invite_token)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    invited_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(default=default_invite_expiry)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["tenant", "email"])]
+
+    def __str__(self):
+        return f"invite {self.email} -> {self.tenant} ({self.status})"
+
+    @property
+    def is_expired(self):
+        return timezone.now() > self.expires_at
 
 
 class TenantScopedModel(models.Model):

@@ -4,7 +4,7 @@ from django.utils.text import slugify
 from rest_framework import serializers
 
 from .models import (
-    ActivityLog, Branch, Customer, Expense, PosProfile, Product, ProductStock,
+    ActivityLog, Branch, Customer, Expense, PosInvite, PosProfile, Product, ProductStock,
     Purchase, Return, ReturnItem, Sale, SaleItem, Tenant,
 )
 
@@ -73,6 +73,75 @@ class PosProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = PosProfile
         fields = ["email", "name", "role", "tenant", "tenant_name", "branch_id"]
+
+
+# ---------------------------------------------------------------------------
+# Invites & roster management
+# ---------------------------------------------------------------------------
+
+class InviteCreateSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    role = serializers.ChoiceField(choices=PosProfile.ROLE_CHOICES)
+    branch = serializers.UUIDField(source="branch_id", required=False, allow_null=True)
+
+    def validate_email(self, value):
+        value = value.lower()
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("An account with this email already exists.")
+        return value
+
+
+class InvitePublicSerializer(serializers.Serializer):
+    """What an unauthenticated invite link shows before the person has set
+    a password — enough to say "you're joining X as a Y", nothing sensitive."""
+
+    email = serializers.EmailField()
+    role = serializers.CharField()
+    business_name = serializers.CharField(source="tenant.name")
+    branch_name = serializers.SerializerMethodField()
+
+    def get_branch_name(self, invite):
+        if not invite.branch_id:
+            return None
+        branch = Branch.objects.filter(id=invite.branch_id, tenant=invite.tenant, is_deleted=False).first()
+        return branch.name if branch else None
+
+
+class InviteAcceptSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    name = serializers.CharField(max_length=150)
+    password = serializers.CharField(write_only=True, validators=[validate_password])
+
+
+class DirectUserCreateSerializer(serializers.Serializer):
+    """Admin creates a teammate's login directly, password included —
+    the alternative to inviting by email when the admin already knows
+    the person and wants them able to log in right away."""
+
+    name = serializers.CharField(max_length=150)
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, validators=[validate_password])
+    role = serializers.ChoiceField(choices=PosProfile.ROLE_CHOICES)
+    branch = serializers.UUIDField(source="branch_id", required=False, allow_null=True)
+
+    def validate_email(self, value):
+        value = value.lower()
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("An account with this email already exists.")
+        return value
+
+
+class RosterEntrySerializer(serializers.Serializer):
+    """Unified read model for Settings > Users & roles: real PosProfiles
+    (status=active) plus outstanding PosInvites (status=invited), so two
+    admins on different devices see the same roster."""
+
+    id = serializers.CharField()
+    name = serializers.CharField()
+    email = serializers.EmailField()
+    role = serializers.CharField()
+    branch_id = serializers.UUIDField(allow_null=True)
+    status = serializers.CharField()
 
 
 # ---------------------------------------------------------------------------

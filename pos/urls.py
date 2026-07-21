@@ -5,8 +5,9 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from .sync import SyncPullView, SyncPushView
 from .views import (
     ActivityLogViewSet, BranchViewSet, CustomerViewSet, ExpenseViewSet,
-    GoogleAuthView, LoginView, MeView, ProductStockViewSet, ProductViewSet,
-    PurchaseViewSet, ReturnViewSet, SaleViewSet, SignupView,
+    GoogleAuthView, InviteAcceptView, InviteCreateView, InviteDetailView,
+    LoginView, MeView, ProductStockViewSet, ProductViewSet, PurchaseViewSet,
+    ReturnViewSet, SaleViewSet, SignupView, UsersView,
 )
 
 router = DefaultRouter()
@@ -26,6 +27,10 @@ urlpatterns = [
     path("auth/google/", GoogleAuthView.as_view(), name="pos-google-auth"),
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="pos-token-refresh"),
     path("auth/me/", MeView.as_view(), name="pos-me"),
+    path("auth/invite/", InviteCreateView.as_view(), name="pos-invite-create"),
+    path("auth/invite/accept/", InviteAcceptView.as_view(), name="pos-invite-accept"),
+    path("auth/invite/<str:token>/", InviteDetailView.as_view(), name="pos-invite-detail"),
+    path("auth/users/", UsersView.as_view(), name="pos-users"),
     path("sync/pull/", SyncPullView.as_view(), name="pos-sync-pull"),
     path("sync/push/", SyncPushView.as_view(), name="pos-sync-push"),
     path("", include(router.urls)),
