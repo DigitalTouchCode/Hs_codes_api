@@ -30,3 +30,4 @@ cryptography==42.0.8
 google-auth==2.36.0
 pillow
 bleach
+django-filter==25.1
