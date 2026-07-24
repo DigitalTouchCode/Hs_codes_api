@@ -1,6 +1,6 @@
 import uuid
+from django.conf import settings
 from django.db import models
-from django.contrib.auth.models import User
 from clients.models import Client
 
 
@@ -73,7 +73,7 @@ class Repair(models.Model):
         max_length=20, choices=RepairStatus.choices, default=RepairStatus.BOOKED
     )
     assigned_to = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="assigned_repairs"
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="assigned_repairs"
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -119,7 +119,7 @@ class RepairStatusLog(models.Model):
     repair = models.ForeignKey(Repair, on_delete=models.CASCADE, related_name="status_logs")
     previous_status = models.CharField(max_length=20, choices=RepairStatus.choices, blank=True)
     new_status = models.CharField(max_length=20, choices=RepairStatus.choices)
-    changed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    changed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     note = models.TextField(blank=True)
     sms_sent = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -133,7 +133,7 @@ class RepairStatusLog(models.Model):
 
 class RepairNote(models.Model):
     repair = models.ForeignKey(Repair, on_delete=models.CASCADE, related_name="notes")
-    added_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    added_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
     content = models.TextField()
     is_internal = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -149,7 +149,7 @@ class RepairCost(models.Model):
     repair = models.ForeignKey(Repair, on_delete=models.CASCADE, related_name="costs")
     description = models.CharField(max_length=255)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    added_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    added_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
