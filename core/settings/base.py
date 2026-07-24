@@ -33,6 +33,10 @@ INSTALLED_APPS = [
     "event",
     "news",
     "pos",
+    "clients",
+    "repairs",
+    "sms",
+    "tracking"
 ]
 
 MIDDLEWARE = [
@@ -162,3 +166,14 @@ EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="DigitalTouch News <info@digitaltouch.co.zw>")
 
 GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID", default="")
+
+
+# SMS
+SMS_ENABLED = config("SMS_ENABLED", default=False)
+SMS_PROVIDER = config("SMS_PROVIDER", default="bulksms")   # bulksms | twilio | africas_talking
+SMS_API_KEY = config("SMS_API_KEY", default="")
+SMS_API_SECRET = config("SMS_API_SECRET", default="")
+SMS_SENDER_ID = config("SMS_SENDER_ID", default="PCRepair")
+
+
+FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000")

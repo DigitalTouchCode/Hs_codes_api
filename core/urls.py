@@ -10,6 +10,9 @@ urlpatterns = [
     path("api/v1/events/", include("event.urls")),
     path("api/v1/news/", include("news.urls")),
     path("api/v1/pos/", include("pos.urls")),
+    path("api/v1/crm/", include("clients.urls")),
+    path("api/v1/repairs/", include("repairs.urls")),
+    path("api/v1/track/", include("tracking.urls")),
 ]
 
 if settings.DEBUG:
