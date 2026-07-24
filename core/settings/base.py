@@ -176,4 +176,4 @@ SMS_API_SECRET = config("SMS_API_SECRET", default="")
 SMS_SENDER_ID = config("SMS_SENDER_ID", default="PCRepair")
 
 
-FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000")
+FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:3000")
